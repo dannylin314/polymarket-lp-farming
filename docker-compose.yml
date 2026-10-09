@@ -1,0 +1,58 @@
+# Always-on farm with a split-tunnel VPN.
+# ONLY the `farm` container egresses through the VPN (it shares gluetun's network
+# namespace via network_mode). The host machine and everything else stay local.
+#
+# All credentials come from a local .env (see .env.example) — nothing secret is
+# committed to this file.
+#
+# Quick start:
+#   1) cp .env.example .env   &&  fill in your values
+#   2) docker compose up -d gluetun
+#      docker compose exec gluetun wget -qO- https://ipinfo.io/json   # verify VPN country
+#   3) docker compose up -d farm   &&   docker compose logs -f farm
+#   kill switch:  docker compose run --rm farm python kill.py
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    cap_add: [NET_ADMIN]
+    devices: ["/dev/net/tun:/dev/net/tun"]
+    environment:
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_TYPE=openvpn
+      # Service credentials from my.nordaccount.com -> "Set up NordVPN manually".
+      # Loaded from .env — never hard-code them here.
+      - OPENVPN_USER=${OPENVPN_USER}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - SERVER_COUNTRIES=Switzerland
+      - TZ=Europe/London
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- https://ipinfo.io/country || exit 1"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+
+  farm:
+    build:
+      context: .
+      dockerfile: Dockerfile.farm
+    # farm shares gluetun's network -> ALL its traffic exits via the VPN.
+    network_mode: "service:gluetun"
+    depends_on:
+      gluetun: { condition: service_healthy }
+    # Account creds (POLY_*) come from your .env — never baked into the image.
+    env_file: [".env"]
+    volumes: ["./lp:/app/lp"]       # live-mount code + persist the local pilot DB
+    environment:
+      - LP_AUTOEXEC=1          # 1 = LIVE (places orders); 0 = dry-run
+      - LP_MARKETS=            # empty = dynamic selection (long-dated, non-toxic)
+      - LP_K_CENTS=1.0         # quote 1c off mid
+      - LP_MAX_INV_USD=75      # per-market dollar inventory cap
+      - LP_MIN_POOL=40         # fat-pool floor
+      - LP_MAX_COMP=800        # skip over-crowded books
+      - LP_DEFAULT_SIZE=50     # shares per side
+      - LP_DAILY_STOP_USD=15   # hard daily loss stop
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

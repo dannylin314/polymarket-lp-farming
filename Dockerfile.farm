@@ -1,0 +1,21 @@
+# Farm image: runs lp/farm.py --loop. Network comes from the gluetun container (see compose).
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+
+# build tools + ca-certs (some polymarket/eth wheels compile; ca-certs for HTTPS)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# requirements.txt should be produced from your WORKING venv so versions match exactly:
+#   <your venv>\Scripts\python.exe -m pip freeze > requirements.txt   (run in polymarket-weather venv)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY lp/ ./lp/
+WORKDIR /app/lp
+
+# --loop = re-quote every LP_INTERVAL_S; restart:unless-stopped in compose keeps it alive.
+CMD ["python", "farm.py", "--loop"]

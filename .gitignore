@@ -1,0 +1,24 @@
+# ── Secrets — NEVER commit ────────────────────────────────────────────────
+# Real credentials live only in a local .env (see .env.example for the shape).
+.env
+*.env
+!.env.example
+key.env
+
+# ── Local state / data ────────────────────────────────────────────────────
+*.db
+*.log
+*_result.json
+
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# ── OS / editor ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

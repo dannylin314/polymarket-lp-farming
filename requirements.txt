@@ -1,0 +1,6 @@
+# Polymarket unified SDK — SecureClient signs CLOB orders and runs gasless
+# merge/redeem of complete sets. Pulls the eth-account / web3 stack transitively.
+polymarket-client==0.10.0
+
+# The scanner, simulator and analysis tools use only the Python standard library
+# (urllib, sqlite3, json, statistics) — no extra dependencies required.
